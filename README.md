@@ -1,4 +1,4 @@
-# kristijanMikroservisi
+<img width="910" height="730" alt="image" src="https://github.com/user-attachments/assets/f68ac1f5-1189-4ddd-bed5-9272279367bf" /># kristijanMikroservisi
 Tehnološki stek
 C# / .NET (ASP.NET Core MVC) – razvoj kompletne aplikacije
 Entity Framework Core – rad sa bazom podataka
@@ -13,3 +13,4 @@ Aplikacija je razvijena kao monolitna web aplikacija koristeći MVC (Model-View-
 Model – predstavlja podatke sistema (Dogadjaj, Lokacija, Predavac, Prijava) i komunikaciju sa bazom
 View (Razor) – prikaz podataka kroz .cshtml stranice
 Controller – obrada zahteva i povezivanje Modela i View-a
+<img width="910" height="730" alt="image" src="https://github.com/user-attachments/assets/e49d8bfa-9f30-489a-af34-c5cbed710cc5" />
