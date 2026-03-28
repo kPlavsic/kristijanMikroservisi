@@ -44,15 +44,55 @@
             @Html.DisplayNameFor(model => model.Lokacija)
         </dt>
         <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.Lokacija.Id)
+            @Html.DisplayFor(model => model.Lokacija.Naziv)
         </dd>
         <dt class = "col-sm-2">
             @Html.DisplayNameFor(model => model.TipDogadjaja)
         </dt>
         <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.TipDogadjaja.Id)
+            @Html.DisplayFor(model => model.TipDogadjaja.Naziv)
         </dd>
     </dl>
+    <h5> Predavači na ovom događaju: </h5>
+    <hr />
+    @if(Model.Angazovanja!=null && Model.Angazovanja.Any())
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>
+                        Titula
+                    </th>
+                    <th>
+                        Naziv predavanja
+                    </th>
+                    <th>
+                        Vreme
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach(var a in Model.Angazovanja)
+                {
+                    <tr>
+                        <td>
+                            @a.Predavac.Titula @a.Predavac.Ime @a.Predavac.Prezime
+                        </td>
+                        <td>
+                            @a.NazivPredavanja
+                        </td>
+                        <td>
+                            @a.Vreme
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <p class="text-muted">Nema angažovanih predavača za ovaj događaj.</p>
+    }
 </div>
 <div>
     <a asp-action="Edit" asp-route-id="@Model?.Id">Edit</a> |

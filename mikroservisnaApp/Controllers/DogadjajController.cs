@@ -37,6 +37,8 @@ namespace mikroservisnaApp.Controllers
             var dogadjaj = await _context.Dogadjaji
                 .Include(d => d.Lokacija)
                 .Include(d => d.TipDogadjaja)
+                .Include(d => d.Angazovanja)
+                    .ThenInclude(a => a.Predavac)
                 .FirstOrDefaultAsync(m => m.Id == id);
             if (dogadjaj == null)
             {
