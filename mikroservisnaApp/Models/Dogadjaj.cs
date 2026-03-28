@@ -12,7 +12,7 @@
         public int LokacijaId { get; set; }
         public Lokacija Lokacija { get; set; }
 
-        public int TipDogadjaja { get; set; }
+        public int TipDogadjajaId { get; set; }
         public TipDogadjaja TipDogadjaja { get; set; }
 
         public List<Angazovanje> Angazovanja { get; set; }
