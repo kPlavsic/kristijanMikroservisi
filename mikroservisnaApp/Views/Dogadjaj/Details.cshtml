@@ -1,0 +1,100 @@
+﻿@model mikroservisnaApp.Models.Dogadjaj
+
+@{
+    ViewData["Title"] = "Details";
+}
+
+<h1>Details</h1>
+
+<div>
+    <h4>Dogadjaj</h4>
+    <hr />
+    <dl class="row">
+        <dt class = "col-sm-2">
+            @Html.DisplayNameFor(model => model.Naziv)
+        </dt>
+        <dd class = "col-sm-10">
+            @Html.DisplayFor(model => model.Naziv)
+        </dd>
+        <dt class = "col-sm-2">
+            @Html.DisplayNameFor(model => model.Agenda)
+        </dt>
+        <dd class = "col-sm-10">
+            @Html.DisplayFor(model => model.Agenda)
+        </dd>
+        <dt class = "col-sm-2">
+            @Html.DisplayNameFor(model => model.DatumIVreme)
+        </dt>
+        <dd class = "col-sm-10">
+            @Html.DisplayFor(model => model.DatumIVreme)
+        </dd>
+        <dt class = "col-sm-2">
+            @Html.DisplayNameFor(model => model.Trajanje)
+        </dt>
+        <dd class = "col-sm-10">
+            @Html.DisplayFor(model => model.Trajanje) h
+        </dd>
+        <dt class = "col-sm-2">
+            @Html.DisplayNameFor(model => model.CenaKotizacije)
+        </dt>
+        <dd class = "col-sm-10">
+            @Html.DisplayFor(model => model.CenaKotizacije)
+        </dd>
+        <dt class = "col-sm-2">
+            @Html.DisplayNameFor(model => model.Lokacija)
+        </dt>
+        <dd class = "col-sm-10">
+            @Html.DisplayFor(model => model.Lokacija.Naziv)
+        </dd>
+        <dt class = "col-sm-2">
+            @Html.DisplayNameFor(model => model.TipDogadjaja)
+        </dt>
+        <dd class = "col-sm-10">
+            @Html.DisplayFor(model => model.TipDogadjaja.Naziv)
+        </dd>
+    </dl>
+    <h5> Predavači na ovom događaju: </h5>
+    <hr />
+    @if(Model.Angazovanja!=null && Model.Angazovanja.Any())
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>
+                        Titula
+                    </th>
+                    <th>
+                        Naziv predavanja
+                    </th>
+                    <th>
+                        Vreme
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach(var a in Model.Angazovanja)
+                {
+                    <tr>
+                        <td>
+                            @a.Predavac.Titula @a.Predavac.Ime @a.Predavac.Prezime
+                        </td>
+                        <td>
+                            @a.NazivPredavanja
+                        </td>
+                        <td>
+                            @a.Vreme
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <p class="text-muted">Nema angažovanih predavača za ovaj događaj.</p>
+    }
+</div>
+<div>
+    <a asp-action="Edit" asp-route-id="@Model?.Id">Edit</a> |
+    <a asp-action="Index">Back to List</a>
+</div>
