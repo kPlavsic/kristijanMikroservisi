@@ -49,8 +49,8 @@ namespace mikroservisnaApp.Controllers
         // GET: Angazovanje/Create
         public IActionResult Create()
         {
-            ViewData["DogadjajId"] = new SelectList(_context.Dogadjaji, "Id", "Id");
-            ViewData["PredavacId"] = new SelectList(_context.Predavaci, "Id", "Id");
+            ViewData["DogadjajId"] = new SelectList(_context.Dogadjaji, "Id", "Naziv");
+            ViewData["PredavacId"] = new SelectList(_context.Predavaci, "Id", "Ime");
             return View();
         }
 
@@ -67,8 +67,8 @@ namespace mikroservisnaApp.Controllers
                 await _context.SaveChangesAsync();
                 return RedirectToAction(nameof(Index));
             }
-            ViewData["DogadjajId"] = new SelectList(_context.Dogadjaji, "Id", "Id", angazovanje.DogadjajId);
-            ViewData["PredavacId"] = new SelectList(_context.Predavaci, "Id", "Id", angazovanje.PredavacId);
+            ViewData["DogadjajId"] = new SelectList(_context.Dogadjaji, "Id", "Naziv", angazovanje.DogadjajId);
+            ViewData["PredavacId"] = new SelectList(_context.Predavaci, "Id", "Ime", angazovanje.PredavacId);
             return View(angazovanje);
         }
 
@@ -85,8 +85,8 @@ namespace mikroservisnaApp.Controllers
             {
                 return NotFound();
             }
-            ViewData["DogadjajId"] = new SelectList(_context.Dogadjaji, "Id", "Id", angazovanje.DogadjajId);
-            ViewData["PredavacId"] = new SelectList(_context.Predavaci, "Id", "Id", angazovanje.PredavacId);
+            ViewData["DogadjajId"] = new SelectList(_context.Dogadjaji, "Id", "Naziv", angazovanje.DogadjajId);
+            ViewData["PredavacId"] = new SelectList(_context.Predavaci, "Id", "Ime", angazovanje.PredavacId);
             return View(angazovanje);
         }
 
@@ -122,8 +122,8 @@ namespace mikroservisnaApp.Controllers
                 }
                 return RedirectToAction(nameof(Index));
             }
-            ViewData["DogadjajId"] = new SelectList(_context.Dogadjaji, "Id", "Id", angazovanje.DogadjajId);
-            ViewData["PredavacId"] = new SelectList(_context.Predavaci, "Id", "Id", angazovanje.PredavacId);
+            ViewData["DogadjajId"] = new SelectList(_context.Dogadjaji, "Id", "Naziv", angazovanje.DogadjajId);
+            ViewData["PredavacId"] = new SelectList(_context.Predavaci, "Id", "Ime", angazovanje.PredavacId);
             return View(angazovanje);
         }
 
