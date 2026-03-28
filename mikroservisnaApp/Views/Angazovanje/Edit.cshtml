@@ -1,0 +1,49 @@
+﻿@model mikroservisnaApp.Models.Angazovanje
+
+@{
+    ViewData["Title"] = "Edit";
+}
+
+<h1>Edit</h1>
+
+<h4>Angazovanje</h4>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <form asp-action="Edit">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <input type="hidden" asp-for="Id" />
+            <div class="form-group">
+                <label asp-for="NazivPredavanja" class="control-label"></label>
+                <input asp-for="NazivPredavanja" class="form-control" />
+                <span asp-validation-for="NazivPredavanja" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="Vreme" class="control-label"></label>
+                <input asp-for="Vreme" class="form-control" />
+                <span asp-validation-for="Vreme" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="PredavacId" class="control-label"></label>
+                <select asp-for="PredavacId" class="form-control" asp-items="ViewBag.PredavacId"></select>
+                <span asp-validation-for="PredavacId" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="DogadjajId" class="control-label"></label>
+                <select asp-for="DogadjajId" class="form-control" asp-items="ViewBag.DogadjajId"></select>
+                <span asp-validation-for="DogadjajId" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <input type="submit" value="Save" class="btn btn-primary" />
+            </div>
+        </form>
+    </div>
+</div>
+
+<div>
+    <a asp-action="Index">Back to List</a>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}
