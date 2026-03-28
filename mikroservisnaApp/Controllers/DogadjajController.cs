@@ -49,8 +49,8 @@ namespace mikroservisnaApp.Controllers
         // GET: Dogadjaj/Create
         public IActionResult Create()
         {
-            ViewData["LokacijaId"] = new SelectList(_context.Lokacije, "Id", "Id");
-            ViewData["TipDogadjajaId"] = new SelectList(_context.TipoviDogadjaja, "Id", "Id");
+            ViewData["LokacijaId"] = new SelectList(_context.Lokacije, "Id", "Naziv");
+            ViewData["TipDogadjajaId"] = new SelectList(_context.TipoviDogadjaja, "Id", "Naziv");
             return View();
         }
 
@@ -67,8 +67,8 @@ namespace mikroservisnaApp.Controllers
                 await _context.SaveChangesAsync();
                 return RedirectToAction(nameof(Index));
             }
-            ViewData["LokacijaId"] = new SelectList(_context.Lokacije, "Id", "Id", dogadjaj.LokacijaId);
-            ViewData["TipDogadjajaId"] = new SelectList(_context.TipoviDogadjaja, "Id", "Id", dogadjaj.TipDogadjajaId);
+            ViewData["LokacijaId"] = new SelectList(_context.Lokacije, "Id", "Naziv", dogadjaj.LokacijaId);
+            ViewData["TipDogadjajaId"] = new SelectList(_context.TipoviDogadjaja, "Id", "Naziv", dogadjaj.TipDogadjajaId);
             return View(dogadjaj);
         }
 
@@ -85,8 +85,8 @@ namespace mikroservisnaApp.Controllers
             {
                 return NotFound();
             }
-            ViewData["LokacijaId"] = new SelectList(_context.Lokacije, "Id", "Id", dogadjaj.LokacijaId);
-            ViewData["TipDogadjajaId"] = new SelectList(_context.TipoviDogadjaja, "Id", "Id", dogadjaj.TipDogadjajaId);
+            ViewData["LokacijaId"] = new SelectList(_context.Lokacije, "Id", "Naziv", dogadjaj.LokacijaId);
+            ViewData["TipDogadjajaId"] = new SelectList(_context.TipoviDogadjaja, "Id", "Naziv", dogadjaj.TipDogadjajaId);
             return View(dogadjaj);
         }
 
@@ -122,8 +122,8 @@ namespace mikroservisnaApp.Controllers
                 }
                 return RedirectToAction(nameof(Index));
             }
-            ViewData["LokacijaId"] = new SelectList(_context.Lokacije, "Id", "Id", dogadjaj.LokacijaId);
-            ViewData["TipDogadjajaId"] = new SelectList(_context.TipoviDogadjaja, "Id", "Id", dogadjaj.TipDogadjajaId);
+            ViewData["LokacijaId"] = new SelectList(_context.Lokacije, "Id", "Naziv", dogadjaj.LokacijaId);
+            ViewData["TipDogadjajaId"] = new SelectList(_context.TipoviDogadjaja, "Id", "Naziv", dogadjaj.TipDogadjajaId);
             return View(dogadjaj);
         }
 
