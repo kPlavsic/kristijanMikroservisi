@@ -1,3 +1,5 @@
 <Solution>
+  <Project Path="../mikroservisnaApp.PredavacAPI.DTO/mikroservisnaApp.PredavacAPI.DTO.csproj" Id="a1bb6580-e88c-4b99-8341-b89259c92e69" />
+  <Project Path="../mikroservisnaApp.PredavacAPI/mikroservisnaApp.PredavacAPI.csproj" Id="ff96b0d8-988d-4003-973c-b30f4588eac8" />
   <Project Path="mikroservisnaApp.csproj" />
 </Solution>

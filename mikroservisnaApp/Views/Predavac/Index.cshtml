@@ -5,6 +5,12 @@
 }
 
 <h1>Index</h1>
+@if (ViewBag.ExceptionMessage != null)
+{
+    <div class="alert alert-danger">
+        @ViewBag.ExceptionMessage
+    </div>
+}
 
 <p>
     <a asp-action="Create">Create New</a>

@@ -5,6 +5,12 @@
 }
 
 <h1>Details</h1>
+@if (ViewBag.ExceptionMessage != null)
+{
+    <div class="alert alert-danger">
+        @ViewBag.ExceptionMessage
+    </div>
+}
 
 <div>
     <h4>Predavac</h4>
