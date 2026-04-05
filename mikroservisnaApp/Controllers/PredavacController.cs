@@ -8,10 +8,6 @@ using Polly;
 
 namespace mikroservisnaApp.Controllers
 {
-    //Index — koristi Retry +Timeout — pokušava 2 puta sa pauzom od 250ms ako API ne odgovori
-    //Details — koristi Circuit Breaker — ako API stalno pada, prestaje da ga zove
-    //Create, Edit, Delete — i dalje koriste direktno bazu glavnog projekta jer nismo izdvajali te operacije
-    
     public class PredavacController : Controller
     {
         private readonly AppDbContext _context;
@@ -127,8 +123,18 @@ namespace mikroservisnaApp.Controllers
         {
             if (ModelState.IsValid)
             {
-                _context.Add(predavac);
-                await _context.SaveChangesAsync();
+                var httpClient = _httpClientFactory.CreateClient("PredavacAPI");
+
+                var predavacDTO = new PredavacDTO()
+                {
+                    Ime = predavac.Ime,
+                    Prezime = predavac.Prezime,
+                    Titula = predavac.Titula,
+                    OblastStrucnosti = predavac.OblastStrucnosti
+                };
+
+                await httpClient.PostAsJsonAsync("/Predavac", predavacDTO);
+
                 return RedirectToAction(nameof(Index));
             }
             return View(predavac);
@@ -140,9 +146,23 @@ namespace mikroservisnaApp.Controllers
             if (id == null)
                 return NotFound();
 
-            var predavac = await _context.Predavaci.FindAsync(id);
-            if (predavac == null)
+            var httpClient = _httpClientFactory.CreateClient("PredavacAPI");
+
+            var response = await httpClient.GetAsync($"/Predavac/{id}");
+
+            if (!response.IsSuccessStatusCode)
                 return NotFound();
+
+            var predavacDTO = await response.Content.ReadFromJsonAsync<PredavacDTO>();
+
+            var predavac = new Predavac()
+            {
+                Id = predavacDTO!.Id,
+                Ime = predavacDTO.Ime,
+                Prezime = predavacDTO.Prezime,
+                Titula = predavacDTO.Titula,
+                OblastStrucnosti = predavacDTO.OblastStrucnosti
+            };
 
             return View(predavac);
         }
@@ -157,18 +177,19 @@ namespace mikroservisnaApp.Controllers
 
             if (ModelState.IsValid)
             {
-                try
+                var httpClient = _httpClientFactory.CreateClient("PredavacAPI");
+
+                var predavacDTO = new PredavacDTO()
                 {
-                    _context.Update(predavac);
-                    await _context.SaveChangesAsync();
-                }
-                catch (DbUpdateConcurrencyException)
-                {
-                    if (!PredavacExists(predavac.Id))
-                        return NotFound();
-                    else
-                        throw;
-                }
+                    Id = predavac.Id,
+                    Ime = predavac.Ime,
+                    Prezime = predavac.Prezime,
+                    Titula = predavac.Titula,
+                    OblastStrucnosti = predavac.OblastStrucnosti
+                };
+
+                await httpClient.PutAsJsonAsync($"/Predavac/{id}", predavacDTO);
+
                 return RedirectToAction(nameof(Index));
             }
             return View(predavac);
@@ -180,10 +201,23 @@ namespace mikroservisnaApp.Controllers
             if (id == null)
                 return NotFound();
 
-            var predavac = await _context.Predavaci
-                .FirstOrDefaultAsync(m => m.Id == id);
-            if (predavac == null)
+            var httpClient = _httpClientFactory.CreateClient("PredavacAPI");
+
+            var response = await httpClient.GetAsync($"/Predavac/{id}");
+
+            if (!response.IsSuccessStatusCode)
                 return NotFound();
+
+            var predavacDTO = await response.Content.ReadFromJsonAsync<PredavacDTO>();
+
+            var predavac = new Predavac()
+            {
+                Id = predavacDTO!.Id,
+                Ime = predavacDTO.Ime,
+                Prezime = predavacDTO.Prezime,
+                Titula = predavacDTO.Titula,
+                OblastStrucnosti = predavacDTO.OblastStrucnosti
+            };
 
             return View(predavac);
         }
@@ -193,11 +227,8 @@ namespace mikroservisnaApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            var predavac = await _context.Predavaci.FindAsync(id);
-            if (predavac != null)
-                _context.Predavaci.Remove(predavac);
-
-            await _context.SaveChangesAsync();
+            var httpClient = _httpClientFactory.CreateClient("PredavacAPI");
+            await httpClient.DeleteAsync($"/Predavac/{id}");
             return RedirectToAction(nameof(Index));
         }
 
