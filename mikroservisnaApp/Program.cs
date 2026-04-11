@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using mikroservisnaApp.Messaging;
 using mikroservisnaApp.Patterns;
 
 
@@ -19,6 +20,8 @@ builder.Services.AddSingleton<CircuitBreaker>(sp =>
 builder.Services.AddControllersWithViews();
 builder.Services.AddDbContext<mikroservisnaApp.Data.AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddSingleton<MessageProducer>();
 
 var app = builder.Build();
 

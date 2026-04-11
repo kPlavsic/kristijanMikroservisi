@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using mikroservisnaApp.Data;
+using mikroservisnaApp.Messaging;
 using mikroservisnaApp.Models;
 using mikroservisnaApp.Patterns;
 using mikroservisnaApp.PredavacAPI.DTO;
@@ -13,12 +14,14 @@ namespace mikroservisnaApp.Controllers
         private readonly AppDbContext _context;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly CircuitBreaker _circuitBreaker;
+        private readonly MessageProducer _messageProducer;
 
-        public PredavacController(AppDbContext context, IHttpClientFactory httpClientFactory, CircuitBreaker circuitBreaker)
+        public PredavacController(AppDbContext context, IHttpClientFactory httpClientFactory, CircuitBreaker circuitBreaker, MessageProducer messageProducer)
         {
             _context = context;
             _httpClientFactory = httpClientFactory;
             _circuitBreaker = circuitBreaker;
+            _messageProducer = messageProducer;
         }
 
         // GET: Predavac
@@ -134,6 +137,7 @@ namespace mikroservisnaApp.Controllers
                 };
 
                 await httpClient.PostAsJsonAsync("/Predavac", predavacDTO);
+                await _messageProducer.PublishAsync("predavac.created", predavacDTO);
 
                 return RedirectToAction(nameof(Index));
             }
@@ -229,6 +233,7 @@ namespace mikroservisnaApp.Controllers
         {
             var httpClient = _httpClientFactory.CreateClient("PredavacAPI");
             await httpClient.DeleteAsync($"/Predavac/{id}");
+            await _messageProducer.PublishAsync("predavac.deleted", new { Id = id });
             return RedirectToAction(nameof(Index));
         }
 
