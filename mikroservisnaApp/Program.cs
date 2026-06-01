@@ -1,13 +1,14 @@
 using Microsoft.EntityFrameworkCore;
+using mikroservisnaApp.HostedServices;
 using mikroservisnaApp.Messaging;
 using mikroservisnaApp.Patterns;
 
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddHttpClient("PredavacAPI", (client) =>
+builder.Services.AddHttpClient("PredavacAPI", (client) => 
 {
-    client.Timeout = TimeSpan.FromSeconds(10);
+    client.Timeout = TimeSpan.FromSeconds(10); //TaskCanceledException
     client.BaseAddress = new Uri(builder.Configuration.GetValue<string>("PredavacAPIEndpoint")!);
 });
 
@@ -22,6 +23,7 @@ builder.Services.AddDbContext<mikroservisnaApp.Data.AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddSingleton<MessageProducer>();
+builder.Services.AddHostedService<OutboxMessagePublisher>();
 
 var app = builder.Build();
 

@@ -4,7 +4,7 @@ using System.Text.Json;
 
 namespace mikroservisnaApp.Messaging
 {
-    public class MessageProducer : IAsyncDisposable
+    public class MessageProducer : IAsyncDisposable //singleton
     {
         private const string ExchangeName = "predavac.exchange";
         private const string QueueName = "predavac.queue";
@@ -30,15 +30,18 @@ namespace mikroservisnaApp.Messaging
             await _channel.QueueBindAsync(QueueName, ExchangeName, RoutingKey);
         }
 
-        public async Task PublishAsync<T>(string eventType, T data)
+        public async Task PublishAsync(string eventType, string payload, string messageId)
         {
             if (_channel == null)
                 await InitializeAsync();
 
-            var message = JsonSerializer.Serialize(new { EventType = eventType, Data = data });
-            var body = Encoding.UTF8.GetBytes(message);
+            var body = Encoding.UTF8.GetBytes(payload);
 
-            var properties = new BasicProperties { Persistent = true };
+            var properties = new BasicProperties
+            {
+                Persistent = true,
+                MessageId = messageId  // ovo consumer koristi za idempotency
+            };
 
             await _channel!.BasicPublishAsync(
                 exchange: ExchangeName,

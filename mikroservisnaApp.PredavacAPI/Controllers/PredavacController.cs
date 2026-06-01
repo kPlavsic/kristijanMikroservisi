@@ -5,9 +5,10 @@ using mikroservisnaApp.PredavacAPI.DTO;
 
 namespace mikroservisnaApp.PredavacAPI.Controllers
 {
+    //hendluje validaciju i vraća 400 Bad Request ako ModelState nije validan
     [ApiController]
     [Route("[controller]")]
-    public class PredavacController : ControllerBase
+    public class PredavacController : ControllerBase //nema View-ova, samo JSON odgovori.
     {
         private readonly PredavacDbContext _context;
 

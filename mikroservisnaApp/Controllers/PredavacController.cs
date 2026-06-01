@@ -1,11 +1,15 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using mikroservisnaApp.Data;
-using mikroservisnaApp.Messaging;
+using mikroservisnaApp.Entities;
 using mikroservisnaApp.Models;
 using mikroservisnaApp.Patterns;
 using mikroservisnaApp.PredavacAPI.DTO;
+using mikroservisnaApp.Shared.Events;
 using Polly;
+using Polly.Timeout;
+using System.Text.Json;
+using System.Threading;
 
 namespace mikroservisnaApp.Controllers
 {
@@ -14,14 +18,12 @@ namespace mikroservisnaApp.Controllers
         private readonly AppDbContext _context;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly CircuitBreaker _circuitBreaker;
-        private readonly MessageProducer _messageProducer;
 
-        public PredavacController(AppDbContext context, IHttpClientFactory httpClientFactory, CircuitBreaker circuitBreaker, MessageProducer messageProducer)
+        public PredavacController(AppDbContext context, IHttpClientFactory httpClientFactory, CircuitBreaker circuitBreaker)
         {
             _context = context;
             _httpClientFactory = httpClientFactory;
             _circuitBreaker = circuitBreaker;
-            _messageProducer = messageProducer;
         }
 
         // GET: Predavac
@@ -33,15 +35,20 @@ namespace mikroservisnaApp.Controllers
             {
                 HttpResponseMessage? httpResponseMessage = null;
 
-                var retryPolicy = Policy.Handle<HttpRequestException>()
+                var retryPolicy = Policy<HttpResponseMessage>
+                    .Handle<HttpRequestException>() //iskljucivo na HttpRequestException
                     .WaitAndRetryAsync(2, attempt => TimeSpan.FromMilliseconds(250));
 
-                httpResponseMessage = await retryPolicy.ExecuteAsync(async () =>
+                var timeoutPolicy = Policy.TimeoutAsync<HttpResponseMessage>(TimeSpan.FromSeconds(10), TimeoutStrategy.Optimistic);
+
+                var policyWrap = Policy.WrapAsync(retryPolicy, timeoutPolicy);
+
+                httpResponseMessage = await policyWrap.ExecuteAsync(async (ct) =>
                 {
-                    var response = await httpClient.GetAsync("/Predavac");
-                    response.EnsureSuccessStatusCode();
+                    var response = await httpClient.GetAsync("/Predavac", ct);
+                    response.EnsureSuccessStatusCode(); //HttpRequestException ako API vrati 4xx ili 5xx — Polly to hvata.
                     return response;
-                });
+                }, CancellationToken.None);
 
                 var predavaci = await httpResponseMessage.Content.ReadFromJsonAsync<List<PredavacDTO>>();
 
@@ -56,9 +63,14 @@ namespace mikroservisnaApp.Controllers
 
                 return View(viewModels);
             }
-            catch (TaskCanceledException)
+            catch (TimeoutRejectedException)
             {
                 ViewBag.ExceptionMessage = "Nije moguće učitati predavače. Timeout istekao.";
+                return View(new List<Predavac>());
+            }
+            catch (TaskCanceledException)
+            {
+                ViewBag.ExceptionMessage = "Nije moguće učitati predavače.";
                 return View(new List<Predavac>());
             }
             catch (HttpRequestException)
@@ -136,14 +148,37 @@ namespace mikroservisnaApp.Controllers
                     OblastStrucnosti = predavac.OblastStrucnosti
                 };
 
-                await httpClient.PostAsJsonAsync("/Predavac", predavacDTO);
-                await _messageProducer.PublishAsync("predavac.created", predavacDTO);
+                // Šaljemo HTTP poziv ka PredavacAPI i čitamo novi ID
+                var response = await httpClient.PostAsJsonAsync("/Predavac", predavacDTO);
+                response.EnsureSuccessStatusCode();
+
+                // PredavacAPI vraća novi ID kao int
+                var newId = await response.Content.ReadFromJsonAsync<int>();
+
+                // Tek ako je HTTP poziv uspeo, snimamo outbox poruku
+                var messageId = Guid.NewGuid().ToString();
+
+                var outboxMessage = new OutboxMessage
+                {
+                    MessageId = messageId,
+                    EventType = "PredavacCreated",
+                    Payload = JsonSerializer.Serialize(new PredavacCreatedEvent
+                    {
+                        MessageId = messageId,
+                        PredavacId = newId,
+                        Ime = predavacDTO.Ime,
+                        Prezime = predavacDTO.Prezime
+                    }),
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                _context.OutboxMessages.Add(outboxMessage);
+                await _context.SaveChangesAsync();
 
                 return RedirectToAction(nameof(Index));
             }
             return View(predavac);
         }
-
         // GET: Predavac/Edit/5
         public async Task<IActionResult> Edit(int? id)
         {
@@ -233,7 +268,6 @@ namespace mikroservisnaApp.Controllers
         {
             var httpClient = _httpClientFactory.CreateClient("PredavacAPI");
             await httpClient.DeleteAsync($"/Predavac/{id}");
-            await _messageProducer.PublishAsync("predavac.deleted", new { Id = id });
             return RedirectToAction(nameof(Index));
         }
 

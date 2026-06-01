@@ -1,4 +1,5 @@
-﻿using RabbitMQ.Client;
+﻿
+using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System.Text;
 using System.Text.Json;
@@ -30,7 +31,7 @@ namespace mikroservisnaApp.PredavacAPI.Messaging
             await _channel.QueueDeclareAsync(QueueName, durable: true, exclusive: false, autoDelete: false);
             await _channel.QueueBindAsync(QueueName, ExchangeName, RoutingKey);
 
-            var consumer = new AsyncEventingBasicConsumer(_channel);
+            var consumer = new AsyncEventingBasicConsumer(_channel); //Ne blokira thread dok ceka poruke.
 
             consumer.ReceivedAsync += async (sender, eventArgs) =>
             {
