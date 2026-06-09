@@ -13,4 +13,4 @@ Aplikacija je razvijena kao monolitna web aplikacija koristeći MVC (Model-View-
 Model – predstavlja podatke sistema (Dogadjaj, Lokacija, Predavac, Prijava) i komunikaciju sa bazom
 View (Razor) – prikaz podataka kroz .cshtml stranice
 Controller – obrada zahteva i povezivanje Modela i View-a
-<img width="500" height="300" alt="image" src="https://github.com/user-attachments/assets/9bdd692f-c4fc-4d5f-8ed9-c9b168f3ffa9" />
+<img width="1324" height="922" alt="image" src="https://github.com/user-attachments/assets/add91d02-6472-4faa-8467-df27f97ecf5e" />
