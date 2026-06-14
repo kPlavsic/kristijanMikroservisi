@@ -1,14 +1,13 @@
 ﻿using RabbitMQ.Client;
 using System.Text;
 using System.Text.Json;
+using mikroservisnaApp.Shared.Events;
 
 namespace mikroservisnaApp.Messaging
 {
-    public class MessageProducer : IAsyncDisposable
+    public class EmailQueueProducer : IAsyncDisposable
     {
-        private const string ExchangeName = "predavac.exchange";
-        private const string QueueName = "predavac.queue";
-        private const string RoutingKey = "predavac.events";
+        private const string EmailQueue = "email.queue";
 
         private IConnection? _connection;
         private IChannel? _channel;
@@ -25,26 +24,29 @@ namespace mikroservisnaApp.Messaging
             _connection = await factory.CreateConnectionAsync();
             _channel = await _connection.CreateChannelAsync();
 
-            await _channel.ExchangeDeclareAsync(ExchangeName, ExchangeType.Direct, durable: true, autoDelete: false);
-
+            await _channel.QueueDeclareAsync(
+                queue: EmailQueue,
+                durable: true,
+                exclusive: false,
+                autoDelete: false);
         }
 
-        public async Task PublishAsync(string eventType, string payload, string messageId)
+        public async Task EnqueueAsync(SendEmailEvent emailEvent)
         {
-            if (_channel == null)
+            if (_channel is null)
                 await InitializeAsync();
 
-            var body = Encoding.UTF8.GetBytes(payload);
+            var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(emailEvent));
 
             var properties = new BasicProperties
             {
                 Persistent = true,
-                MessageId = messageId 
+                MessageId = emailEvent.MessageId
             };
 
             await _channel!.BasicPublishAsync(
-                exchange: ExchangeName,
-                routingKey: RoutingKey,
+                exchange: string.Empty,
+                routingKey: EmailQueue,
                 mandatory: false,
                 basicProperties: properties,
                 body: body);

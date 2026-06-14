@@ -15,8 +15,15 @@ namespace mikroservisnaApp.DogadjajAPI.HostedServices
         private const string QueueName = "predavac.queue";
         private const string RoutingKey = "predavac.events";
 
+        
+        private const string DeadLetterExchangeName = "predavac.dlx";
+        private const string DeadLetterQueueName = "predavac.deadletter.queue";
+        private const int MaxRetryCount = 10;
+
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly ILogger<RabbitMqConsumerHostedService> _logger;
+
+        private readonly Dictionary<string, int> _retryCounts = new();
 
         private IConnection? _connection;
         private IChannel? _channel;
@@ -41,11 +48,41 @@ namespace mikroservisnaApp.DogadjajAPI.HostedServices
             _connection = await factory.CreateConnectionAsync();
             _channel = await _connection.CreateChannelAsync();
 
+            
+            await _channel.ExchangeDeclareAsync(
+                exchange: DeadLetterExchangeName,
+                type: ExchangeType.Fanout,
+                durable: true,
+                autoDelete: false);
+
+            
+            await _channel.QueueDeclareAsync(
+                queue: DeadLetterQueueName,
+                durable: true,
+                exclusive: false,
+                autoDelete: false);
+
+            
+            await _channel.QueueBindAsync(
+                queue: DeadLetterQueueName,
+                exchange: DeadLetterExchangeName,
+                routingKey: string.Empty);
+
+            
+            var queueArguments = new Dictionary<string, object?>
+            {
+                { "x-dead-letter-exchange", DeadLetterExchangeName }
+            };
+
             await _channel.ExchangeDeclareAsync(ExchangeName, ExchangeType.Direct, durable: true, autoDelete: false);
-            await _channel.QueueDeclareAsync(QueueName, durable: true, exclusive: false, autoDelete: false);
+            await _channel.QueueDeclareAsync(
+                queue: QueueName,
+                durable: true,
+                exclusive: false,
+                autoDelete: false,
+                arguments: queueArguments);
             await _channel.QueueBindAsync(QueueName, ExchangeName, RoutingKey);
 
-            // Koliko poruka odjednom prima - 1 znaci obradi jednu po jednu
             await _channel.BasicQosAsync(prefetchSize: 0, prefetchCount: 1, global: false);
 
             var consumer = new AsyncEventingBasicConsumer(_channel);
@@ -53,7 +90,7 @@ namespace mikroservisnaApp.DogadjajAPI.HostedServices
 
             await _channel.BasicConsumeAsync(queue: QueueName, autoAck: false, consumer: consumer);
 
-            _logger.LogInformation("DogadjajAPI sluša na queuu: {Queue}", QueueName);
+            _logger.LogInformation("DogadjajAPI slusa na queuu: {Queue}", QueueName);
 
             try
             {
@@ -64,26 +101,31 @@ namespace mikroservisnaApp.DogadjajAPI.HostedServices
 
         private async Task HandleMessageAsync(BasicDeliverEventArgs ea, CancellationToken cancellationToken)
         {
+            
             if (_channel is null) return;
+
+            
+            var messageKey = ea.BasicProperties.MessageId ?? ea.DeliveryTag.ToString();
+            _logger.LogInformation("MessageId={MessageId}, DeliveryTag={DeliveryTag}, MessageKey={MessageKey}",
+    ea.BasicProperties.MessageId, ea.DeliveryTag, messageKey);
 
             try
             {
                 using var scope = _scopeFactory.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<DogadjajDbContext>();
 
-                // Deserijalizuj poruku
                 var body = Encoding.UTF8.GetString(ea.Body.ToArray());
                 var predavacEvent = JsonSerializer.Deserialize<PredavacCreatedEvent>(body);
 
                 if (predavacEvent is null)
                 {
-                    _logger.LogWarning("Nevažeći payload primljen. DeliveryTag: {DeliveryTag}", ea.DeliveryTag);
-                    await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+                    _logger.LogWarning("Nevazeći payload. Poruka se odbacuje bez retry-a.");
+                    
+                    _retryCounts.Remove(messageKey);
+                    await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false);
                     return;
                 }
 
-                // Idempotent consumer - kljucni deo
-                // Otvaramo transakciju da bi provera i upis bili atomski
                 await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
 
                 var alreadyProcessed = await db.ProcessedMessages
@@ -91,7 +133,6 @@ namespace mikroservisnaApp.DogadjajAPI.HostedServices
 
                 if (!alreadyProcessed)
                 {
-                    // Sačuvaj lokalnu kopiju predavača
                     var predavacReference = new PredavacReference
                     {
                         Id = predavacEvent.PredavacId,
@@ -101,7 +142,6 @@ namespace mikroservisnaApp.DogadjajAPI.HostedServices
 
                     db.PredavacReference.Add(predavacReference);
 
-                    // Zapamti da smo obradili ovu poruku
                     db.ProcessedMessages.Add(new ProcessedMessage
                     {
                         EventId = predavacEvent.MessageId,
@@ -112,22 +152,39 @@ namespace mikroservisnaApp.DogadjajAPI.HostedServices
                     await db.SaveChangesAsync(cancellationToken);
                     await tx.CommitAsync(cancellationToken);
 
-                    _logger.LogInformation("Predavac {PredavacId} sačuvan u DogadjajAPI", predavacEvent.PredavacId);
+                    _logger.LogInformation("Predavac {PredavacId} sacuvan u DogadjajAPI", predavacEvent.PredavacId);
                 }
                 else
                 {
-                    _logger.LogInformation("Poruka {MessageId} već obrađena, preskačemo", predavacEvent.MessageId);
+                    _logger.LogInformation("Poruka {MessageId} vec obradjena, preskacemo", predavacEvent.MessageId);
                 }
 
-                // Potvrdi RabbitMQ-u da je poruka uspešno obrađena
+                _retryCounts.Remove(messageKey);
                 await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Greška pri obradi poruke. DeliveryTag: {DeliveryTag}", ea.DeliveryTag);
+                
+                _retryCounts.TryGetValue(messageKey, out var currentCount);
+                var newCount = currentCount + 1;
+                _retryCounts[messageKey] = newCount;
 
-                // Vrati poruku u queue da bi bila pokušana ponovo
-                await _channel!.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: true);
+                _logger.LogError(ex, "Greska pri obradi poruke {MessageKey}. Pokusaj {Count}/{Max}",
+                    messageKey, newCount, MaxRetryCount);
+
+                if (newCount >= MaxRetryCount)
+                {
+                   
+                    _logger.LogWarning("Poruka {MessageKey} dostigla maksimalan broj pokusaja. Saljem na DLQ.", messageKey);
+                    _retryCounts.Remove(messageKey);
+
+                    await _channel!.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false);
+                }
+                else
+                {
+
+                    await _channel!.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: true);
+                }
             }
         }
 

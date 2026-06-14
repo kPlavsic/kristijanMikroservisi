@@ -23,7 +23,11 @@ builder.Services.AddDbContext<mikroservisnaApp.Data.AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddSingleton<MessageProducer>();
+builder.Services.AddSingleton<PredavacValidationClient>();
+builder.Services.AddSingleton<EmailQueueProducer>();
 builder.Services.AddHostedService<OutboxMessagePublisher>();
+builder.Services.AddHostedService<EmailWorker>();
+builder.Services.AddHostedService<PredavacEventConsumer>();
 
 var app = builder.Build();
 

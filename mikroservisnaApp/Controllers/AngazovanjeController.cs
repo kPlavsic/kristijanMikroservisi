@@ -1,12 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using mikroservisnaApp.Data;
+using mikroservisnaApp.Messaging;
 using mikroservisnaApp.Models;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace mikroservisnaApp.Controllers
 {
@@ -55,18 +56,38 @@ namespace mikroservisnaApp.Controllers
         }
 
         // POST: Angazovanje/Create
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create([Bind("Id,NazivPredavanja,Vreme,PredavacId,DogadjajId")] Angazovanje angazovanje)
         {
             if (ModelState.IsValid)
             {
+                var validationClient = HttpContext.RequestServices.GetRequiredService<PredavacValidationClient>();
+                var response = await validationClient.ValidateAsync(angazovanje.PredavacId);
+
+                if (!response.Exists)
+                {
+                    ModelState.AddModelError("PredavacId", $"Predavac sa ID={angazovanje.PredavacId} ne postoji u sistemu.");
+                    ViewData["DogadjajId"] = new SelectList(_context.Dogadjaji, "Id", "Naziv", angazovanje.DogadjajId);
+                    ViewData["PredavacId"] = new SelectList(_context.Predavaci, "Id", "Ime", angazovanje.PredavacId);
+                    return View(angazovanje);
+                }
+
                 _context.Add(angazovanje);
                 await _context.SaveChangesAsync();
+
+                var emailProducer = HttpContext.RequestServices.GetRequiredService<EmailQueueProducer>();
+                await emailProducer.EnqueueAsync(new mikroservisnaApp.Shared.Events.SendEmailEvent
+                {
+                    To = $"predavac_{angazovanje.PredavacId}@example.com",
+                    Subject = "Novo angazovanje",
+                    Body = $"Postovani, angazovani ste za predavanje '{angazovanje.NazivPredavanja}' " +
+                           $"koje se odrzava {angazovanje.Vreme:dd.MM.yyyy u HH:mm}."
+                });
+
                 return RedirectToAction(nameof(Index));
             }
+
             ViewData["DogadjajId"] = new SelectList(_context.Dogadjaji, "Id", "Naziv", angazovanje.DogadjajId);
             ViewData["PredavacId"] = new SelectList(_context.Predavaci, "Id", "Ime", angazovanje.PredavacId);
             return View(angazovanje);

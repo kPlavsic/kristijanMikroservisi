@@ -148,14 +148,13 @@ namespace mikroservisnaApp.Controllers
                     OblastStrucnosti = predavac.OblastStrucnosti
                 };
 
-                // Šaljemo HTTP poziv ka PredavacAPI i čitamo novi ID
+                
                 var response = await httpClient.PostAsJsonAsync("/Predavac", predavacDTO);
                 response.EnsureSuccessStatusCode();
 
-                // PredavacAPI vraća novi ID kao int
                 var newId = await response.Content.ReadFromJsonAsync<int>();
 
-                // Tek ako je HTTP poziv uspeo, snimamo outbox poruku
+               
                 var messageId = Guid.NewGuid().ToString();
 
                 var outboxMessage = new OutboxMessage

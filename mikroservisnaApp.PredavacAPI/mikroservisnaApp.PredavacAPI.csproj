@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\mikroservisnaApp.PredavacAPI.DTO\mikroservisnaApp.PredavacAPI.DTO.csproj" />
+    <ProjectReference Include="..\mikroservisnaApp.Shared\mikroservisnaApp.Shared.csproj" />
   </ItemGroup>
 
 </Project>

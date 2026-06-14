@@ -25,7 +25,6 @@ namespace mikroservisnaApp.HostedServices
                     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                     var producer = scope.ServiceProvider.GetRequiredService<MessageProducer>();
 
-                    // Uzmi najstarijih 5 poruka koje čekaju
                     var pending = await db.OutboxMessages
                         .OrderBy(x => x.CreatedAt)
                         .Take(5)
@@ -35,10 +34,8 @@ namespace mikroservisnaApp.HostedServices
                     {
                         try
                         {
-                            // Pošalji poruku na RabbitMQ sa MessageId kao korelacioni ID
                             await producer.PublishAsync(message.EventType, message.Payload, message.MessageId);
 
-                            // Ako je slanje uspelo, obrišemo poruku iz outbox tabele
                             db.OutboxMessages.Remove(message);
                             await db.SaveChangesAsync(stoppingToken);
                         }
@@ -53,7 +50,6 @@ namespace mikroservisnaApp.HostedServices
                     _logger.LogError(ex, "Neočekivana greška u OutboxMessagePublisher-u");
                 }
 
-                // Sačekaj 5 sekundi pre sledeceg pokušaja
                 await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
             }
         }
