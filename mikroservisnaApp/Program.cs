@@ -28,6 +28,7 @@ builder.Services.AddSingleton<EmailQueueProducer>();
 builder.Services.AddHostedService<OutboxMessagePublisher>();
 builder.Services.AddHostedService<EmailWorker>();
 builder.Services.AddHostedService<PredavacEventConsumer>();
+builder.Services.AddHostedService<SagaAngazovanjeConsumer>();
 
 var app = builder.Build();
 

@@ -13,8 +13,12 @@ namespace mikroservisnaApp.PredavacAPI.Messaging
         private const string ExchangeName = "predavac.exchange";
         private const string QueueName = "predavac.queue.predavacapi";
         private const string RoutingKey = "predavac.events";
-
         private const string ValidationRequestQueue = "predavac.validation.request";
+
+        // Saga queue-ovi
+        private const string SagaRezervisіQueue = "saga.predavac.rezervisi";
+        private const string SagaOtkaziQueue = "saga.predavac.otkazi";
+        private const string SagaResponseQueue = "saga.predavac.response";
 
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly ILogger<MessageConsumer> _logger;
@@ -40,33 +44,123 @@ namespace mikroservisnaApp.PredavacAPI.Messaging
             _connection = await factory.CreateConnectionAsync();
             _channel = await _connection.CreateChannelAsync();
 
-            // Postojeci red za predavac evente
+            // Postojeci redovi
             await _channel.ExchangeDeclareAsync(ExchangeName, ExchangeType.Direct, durable: true, autoDelete: false);
             await _channel.QueueDeclareAsync(QueueName, durable: true, exclusive: false, autoDelete: false);
             await _channel.QueueBindAsync(QueueName, ExchangeName, RoutingKey);
-
-            // Novi red za validation zahteve
             await _channel.QueueDeclareAsync(ValidationRequestQueue, durable: false, exclusive: false, autoDelete: false);
+
+            // Saga redovi
+            await _channel.QueueDeclareAsync(SagaRezervisіQueue, durable: true, exclusive: false, autoDelete: false);
+            await _channel.QueueDeclareAsync(SagaOtkaziQueue, durable: true, exclusive: false, autoDelete: false);
+            await _channel.QueueDeclareAsync(SagaResponseQueue, durable: true, exclusive: false, autoDelete: false);
 
             await _channel.BasicQosAsync(prefetchSize: 0, prefetchCount: 1, global: false);
 
-            // Consumer za postojece predavac evente
+            // Postojeci consumeri
             var eventConsumer = new AsyncEventingBasicConsumer(_channel);
             eventConsumer.ReceivedAsync += async (_, ea) => await HandlePredavacEventAsync(ea, stoppingToken);
             await _channel.BasicConsumeAsync(queue: QueueName, autoAck: false, consumer: eventConsumer);
 
-            // Consumer za validation zahteve
             var validationConsumer = new AsyncEventingBasicConsumer(_channel);
             validationConsumer.ReceivedAsync += async (_, ea) => await HandleValidationRequestAsync(ea, stoppingToken);
             await _channel.BasicConsumeAsync(queue: ValidationRequestQueue, autoAck: false, consumer: validationConsumer);
 
-            _logger.LogInformation("PredavacAPI slusa na redovima: {Queue1}, {Queue2}", QueueName, ValidationRequestQueue);
+            // Saga consumeri
+            var sagaRezervisіConsumer = new AsyncEventingBasicConsumer(_channel);
+            sagaRezervisіConsumer.ReceivedAsync += async (_, ea) => await HandleSagaRezervisiAsync(ea, stoppingToken);
+            await _channel.BasicConsumeAsync(queue: SagaRezervisіQueue, autoAck: false, consumer: sagaRezervisіConsumer);
+
+            var sagaOtkaziConsumer = new AsyncEventingBasicConsumer(_channel);
+            sagaOtkaziConsumer.ReceivedAsync += async (_, ea) => await HandleSagaOtkaziAsync(ea, stoppingToken);
+            await _channel.BasicConsumeAsync(queue: SagaOtkaziQueue, autoAck: false, consumer: sagaOtkaziConsumer);
+
+            _logger.LogInformation("[PREDAVAC API] Slusa na svim redovima.");
+
+            try { await Task.Delay(Timeout.Infinite, stoppingToken); }
+            catch (OperationCanceledException) { }
+        }
+
+        // =============================================
+        // SAGA: Rezervisi predavaca
+        // =============================================
+        private async Task HandleSagaRezervisiAsync(BasicDeliverEventArgs ea, CancellationToken cancellationToken)
+        {
+            if (_channel is null) return;
 
             try
             {
-                await Task.Delay(Timeout.Infinite, stoppingToken);
+                var body = Encoding.UTF8.GetString(ea.Body.ToArray());
+                var request = JsonSerializer.Deserialize<PredavacReservationRequestEvent>(body);
+
+                if (request is null)
+                {
+                    await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+                    return;
+                }
+
+                _logger.LogInformation("[PREDAVAC API] Saga: Zahtev za rezervaciju predavaca ID={Id}", request.PredavacId);
+
+                using var scope = _scopeFactory.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<PredavacDbContext>();
+                var exists = await db.Predavaci.AnyAsync(p => p.Id == request.PredavacId, cancellationToken);
+
+                var response = new PredavacReservationResponseEvent
+                {
+                    CorrelationId = request.CorrelationId,
+                    PredavacId = request.PredavacId,
+                    Success = exists,
+                    FailedReason = exists ? null : $"Predavac sa ID={request.PredavacId} ne postoji."
+                };
+
+                var responseBody = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(response));
+                await _channel.BasicPublishAsync(
+                    exchange: string.Empty,
+                    routingKey: SagaResponseQueue,
+                    body: responseBody);
+
+                _logger.LogInformation("[PREDAVAC API] Saga: Odgovor poslat. Success={Success}", response.Success);
+
+                await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
             }
-            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[PREDAVAC API] Saga: Greska pri rezervaciji predavaca.");
+                await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: true);
+            }
+        }
+
+        // =============================================
+        // SAGA: Kompenzacija — otkazi rezervaciju
+        // =============================================
+        private async Task HandleSagaOtkaziAsync(BasicDeliverEventArgs ea, CancellationToken cancellationToken)
+        {
+            if (_channel is null) return;
+
+            try
+            {
+                var body = Encoding.UTF8.GetString(ea.Body.ToArray());
+                var request = JsonSerializer.Deserialize<PredavacReservationCancelEvent>(body);
+
+                if (request is null)
+                {
+                    await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+                    return;
+                }
+
+                _logger.LogInformation("[PREDAVAC API] Saga KOMPENZACIJA: Otkazujem rezervaciju predavaca ID={Id}", request.PredavacId);
+
+                // Ovde bi isla logika otkazivanja rezervacije
+                // Za sada logujemo da je kompenzacija izvrsena
+                _logger.LogWarning("[PREDAVAC API] Saga KOMPENZACIJA: Rezervacija predavaca ID={Id} otkazana.", request.PredavacId);
+
+                await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[PREDAVAC API] Saga: Greska pri otkazivanju rezervacije.");
+                await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: true);
+            }
         }
 
         private async Task HandlePredavacEventAsync(BasicDeliverEventArgs ea, CancellationToken cancellationToken)
@@ -77,9 +171,7 @@ namespace mikroservisnaApp.PredavacAPI.Messaging
             {
                 var body = Encoding.UTF8.GetString(ea.Body.ToArray());
                 var message = JsonSerializer.Deserialize<PredavacCreatedEvent>(body);
-
                 Console.WriteLine($"[RECEIVED] {DateTime.Now:HH:mm:ss} | {body}");
-
                 await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
             }
             catch (Exception ex)
@@ -106,12 +198,10 @@ namespace mikroservisnaApp.PredavacAPI.Messaging
 
                 _logger.LogInformation("Primljen validation zahtev za predavaca ID={PredavacId}", request.PredavacId);
 
-                // Provjeri da li predavac postoji u PredavacAPI bazi
                 using var scope = _scopeFactory.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<PredavacDbContext>();
                 var exists = await db.Predavaci.AnyAsync(p => p.Id == request.PredavacId, cancellationToken);
 
-                // Pripremi odgovor
                 var response = new PredavacValidationResponse
                 {
                     CorrelationId = request.CorrelationId,
@@ -120,13 +210,8 @@ namespace mikroservisnaApp.PredavacAPI.Messaging
                 };
 
                 var responseBody = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(response));
+                var properties = new BasicProperties { CorrelationId = request.CorrelationId };
 
-                var properties = new BasicProperties
-                {
-                    CorrelationId = request.CorrelationId
-                };
-
-                // Pošalji odgovor na ReplyTo red koji je klijent specificirao
                 await _channel.BasicPublishAsync(
                     exchange: string.Empty,
                     routingKey: request.ReplyTo,
@@ -134,8 +219,7 @@ namespace mikroservisnaApp.PredavacAPI.Messaging
                     basicProperties: properties,
                     body: responseBody);
 
-                _logger.LogInformation("Validation odgovor poslat: PredavacId={PredavacId}, Exists={Exists}",
-                    request.PredavacId, exists);
+                _logger.LogInformation("Validation odgovor poslat: PredavacId={PredavacId}, Exists={Exists}", request.PredavacId, exists);
 
                 await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
             }

@@ -2,6 +2,7 @@
   <Project Path="../mikroservisnaApp.DogadjajAPI/mikroservisnaApp.DogadjajAPI.csproj" Id="fe7c7ff7-cd59-426f-89a0-4e5506412262" />
   <Project Path="../mikroservisnaApp.PredavacAPI.DTO/mikroservisnaApp.PredavacAPI.DTO.csproj" Id="a1bb6580-e88c-4b99-8341-b89259c92e69" />
   <Project Path="../mikroservisnaApp.PredavacAPI/mikroservisnaApp.PredavacAPI.csproj" Id="ff96b0d8-988d-4003-973c-b30f4588eac8" />
+  <Project Path="../mikroservisnaApp.SagaOrchestrator/mikroservisnaApp.SagaOrchestrator.csproj" Id="2884c7c4-0a6d-46a9-a835-1b5232e8756f" />
   <Project Path="../mikroservisnaApp.Shared/mikroservisnaApp.Shared.csproj" Id="af0fc7b4-282c-4eae-993a-8140281d4e0e" />
   <Project Path="mikroservisnaApp.csproj" />
 </Solution>

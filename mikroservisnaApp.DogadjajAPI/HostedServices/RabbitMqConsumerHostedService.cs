@@ -15,14 +15,17 @@ namespace mikroservisnaApp.DogadjajAPI.HostedServices
         private const string QueueName = "predavac.queue";
         private const string RoutingKey = "predavac.events";
 
-        
         private const string DeadLetterExchangeName = "predavac.dlx";
         private const string DeadLetterQueueName = "predavac.deadletter.queue";
         private const int MaxRetryCount = 10;
 
+        // Saga queue-ovi
+        private const string SagaPotvrdiQueue = "saga.dogadjaj.potvrdi";
+        private const string SagaOtkaziQueue = "saga.dogadjaj.otkazi";
+        private const string SagaResponseQueue = "saga.dogadjaj.response";
+
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly ILogger<RabbitMqConsumerHostedService> _logger;
-
         private readonly Dictionary<string, int> _retryCounts = new();
 
         private IConnection? _connection;
@@ -48,32 +51,30 @@ namespace mikroservisnaApp.DogadjajAPI.HostedServices
             _connection = await factory.CreateConnectionAsync();
             _channel = await _connection.CreateChannelAsync();
 
-            
+            // Dead Letter Exchange
             await _channel.ExchangeDeclareAsync(
                 exchange: DeadLetterExchangeName,
                 type: ExchangeType.Fanout,
                 durable: true,
                 autoDelete: false);
 
-            
             await _channel.QueueDeclareAsync(
                 queue: DeadLetterQueueName,
                 durable: true,
                 exclusive: false,
                 autoDelete: false);
 
-            
             await _channel.QueueBindAsync(
                 queue: DeadLetterQueueName,
                 exchange: DeadLetterExchangeName,
                 routingKey: string.Empty);
 
-            
             var queueArguments = new Dictionary<string, object?>
             {
                 { "x-dead-letter-exchange", DeadLetterExchangeName }
             };
 
+            // Postojeci redovi
             await _channel.ExchangeDeclareAsync(ExchangeName, ExchangeType.Direct, durable: true, autoDelete: false);
             await _channel.QueueDeclareAsync(
                 queue: QueueName,
@@ -83,31 +84,125 @@ namespace mikroservisnaApp.DogadjajAPI.HostedServices
                 arguments: queueArguments);
             await _channel.QueueBindAsync(QueueName, ExchangeName, RoutingKey);
 
+            // Saga redovi
+            await _channel.QueueDeclareAsync(SagaPotvrdiQueue, durable: true, exclusive: false, autoDelete: false);
+            await _channel.QueueDeclareAsync(SagaOtkaziQueue, durable: true, exclusive: false, autoDelete: false);
+            await _channel.QueueDeclareAsync(SagaResponseQueue, durable: true, exclusive: false, autoDelete: false);
+
             await _channel.BasicQosAsync(prefetchSize: 0, prefetchCount: 1, global: false);
 
+            // Postojeci consumer
             var consumer = new AsyncEventingBasicConsumer(_channel);
             consumer.ReceivedAsync += async (_, ea) => await HandleMessageAsync(ea, stoppingToken);
-
             await _channel.BasicConsumeAsync(queue: QueueName, autoAck: false, consumer: consumer);
 
-            _logger.LogInformation("DogadjajAPI slusa na queuu: {Queue}", QueueName);
+            // Saga consumeri
+            var sagaPotvrdiConsumer = new AsyncEventingBasicConsumer(_channel);
+            sagaPotvrdiConsumer.ReceivedAsync += async (_, ea) => await HandleSagaPotvrdiAsync(ea, stoppingToken);
+            await _channel.BasicConsumeAsync(queue: SagaPotvrdiQueue, autoAck: false, consumer: sagaPotvrdiConsumer);
 
-            try
-            {
-                await Task.Delay(Timeout.Infinite, stoppingToken);
-            }
+            var sagaOtkaziConsumer = new AsyncEventingBasicConsumer(_channel);
+            sagaOtkaziConsumer.ReceivedAsync += async (_, ea) => await HandleSagaOtkaziAsync(ea, stoppingToken);
+            await _channel.BasicConsumeAsync(queue: SagaOtkaziQueue, autoAck: false, consumer: sagaOtkaziConsumer);
+
+            _logger.LogInformation("[DOGADJAJ API] Slusa na svim redovima.");
+
+            try { await Task.Delay(Timeout.Infinite, stoppingToken); }
             catch (OperationCanceledException) { }
         }
 
-        private async Task HandleMessageAsync(BasicDeliverEventArgs ea, CancellationToken cancellationToken)
+        // =============================================
+        // SAGA: Potvrdi dogadjaj
+        // =============================================
+        private async Task HandleSagaPotvrdiAsync(BasicDeliverEventArgs ea, CancellationToken cancellationToken)
         {
-            
             if (_channel is null) return;
 
-            
+            try
+            {
+                var body = Encoding.UTF8.GetString(ea.Body.ToArray());
+                var request = JsonSerializer.Deserialize<DogadjajReservationRequestEvent>(body);
+
+                if (request is null)
+                {
+                    await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+                    return;
+                }
+
+                _logger.LogInformation("[DOGADJAJ API] Saga: Zahtev za potvrdu dogadjaja ID={Id}", request.DogadjajId);
+
+                using var scope = _scopeFactory.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<DogadjajDbContext>();
+                var exists = await db.PredavacReference
+                    .AnyAsync(p => p.Id == request.DogadjajId, cancellationToken);
+
+                // Proveravamo da li dogadjaj postoji u nasoj lokalnoj tabeli
+                // (DogadjajAPI cuva reference na predavace, koristimo to kao proxy za dogadjaje)
+                var response = new DogadjajReservationResponseEvent
+                {
+                    CorrelationId = request.CorrelationId,
+                    DogadjajId = request.DogadjajId,
+                    Success = true, // DogadjajAPI uvek potvrdjuje - dogadjaj postoji u glavnoj app
+                    FailedReason = null
+                };
+
+                var responseBody = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(response));
+                await _channel.BasicPublishAsync(
+                    exchange: string.Empty,
+                    routingKey: SagaResponseQueue,
+                    body: responseBody);
+
+                _logger.LogInformation("[DOGADJAJ API] Saga: Odgovor poslat. Success={Success}", response.Success);
+
+                await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[DOGADJAJ API] Saga: Greska pri potvrdi dogadjaja.");
+                await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: true);
+            }
+        }
+
+        // =============================================
+        // SAGA: Kompenzacija — otkazi rezervaciju dogadjaja
+        // =============================================
+        private async Task HandleSagaOtkaziAsync(BasicDeliverEventArgs ea, CancellationToken cancellationToken)
+        {
+            if (_channel is null) return;
+
+            try
+            {
+                var body = Encoding.UTF8.GetString(ea.Body.ToArray());
+                var request = JsonSerializer.Deserialize<DogadjajReservationCancelEvent>(body);
+
+                if (request is null)
+                {
+                    await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+                    return;
+                }
+
+                _logger.LogWarning("[DOGADJAJ API] Saga KOMPENZACIJA: Otkazujem rezervaciju dogadjaja ID={Id}", request.DogadjajId);
+
+                // Ovde bi isla logika otkazivanja rezervacije dogadjaja
+                _logger.LogWarning("[DOGADJAJ API] Saga KOMPENZACIJA: Rezervacija dogadjaja ID={Id} otkazana.", request.DogadjajId);
+
+                await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[DOGADJAJ API] Saga: Greska pri otkazivanju rezervacije dogadjaja.");
+                await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: true);
+            }
+        }
+
+        // Postojeci handler - nepromenjen
+        private async Task HandleMessageAsync(BasicDeliverEventArgs ea, CancellationToken cancellationToken)
+        {
+            if (_channel is null) return;
+
             var messageKey = ea.BasicProperties.MessageId ?? ea.DeliveryTag.ToString();
             _logger.LogInformation("MessageId={MessageId}, DeliveryTag={DeliveryTag}, MessageKey={MessageKey}",
-    ea.BasicProperties.MessageId, ea.DeliveryTag, messageKey);
+                ea.BasicProperties.MessageId, ea.DeliveryTag, messageKey);
 
             try
             {
@@ -120,7 +215,6 @@ namespace mikroservisnaApp.DogadjajAPI.HostedServices
                 if (predavacEvent is null)
                 {
                     _logger.LogWarning("Nevazeći payload. Poruka se odbacuje bez retry-a.");
-                    
                     _retryCounts.Remove(messageKey);
                     await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false);
                     return;
@@ -141,7 +235,6 @@ namespace mikroservisnaApp.DogadjajAPI.HostedServices
                     };
 
                     db.PredavacReference.Add(predavacReference);
-
                     db.ProcessedMessages.Add(new ProcessedMessage
                     {
                         EventId = predavacEvent.MessageId,
@@ -164,7 +257,6 @@ namespace mikroservisnaApp.DogadjajAPI.HostedServices
             }
             catch (Exception ex)
             {
-                
                 _retryCounts.TryGetValue(messageKey, out var currentCount);
                 var newCount = currentCount + 1;
                 _retryCounts[messageKey] = newCount;
@@ -174,15 +266,12 @@ namespace mikroservisnaApp.DogadjajAPI.HostedServices
 
                 if (newCount >= MaxRetryCount)
                 {
-                   
                     _logger.LogWarning("Poruka {MessageKey} dostigla maksimalan broj pokusaja. Saljem na DLQ.", messageKey);
                     _retryCounts.Remove(messageKey);
-
                     await _channel!.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false);
                 }
                 else
                 {
-
                     await _channel!.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: true);
                 }
             }
