@@ -1,0 +1,6 @@
+MessageId: f651790fa868494abe80b36f4e0fd5e6
+To: predavac_1@example.com
+Subject: Novo angazovanje
+SentAt: 2026-06-01 10:15:00 UTC
+
+Postovani, angazovani ste za predavanje 'NekoNovoPredavanje' koje se odrzava 26.06.2026 u 12:14.

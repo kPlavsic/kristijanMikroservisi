@@ -49,9 +49,6 @@ namespace mikroservisnaApp.Controllers
             return View();
         }
 
-        // POST: TipDogadjaja/Create
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create([Bind("Id,Naziv")] TipDogadjaja tipDogadjaja)
@@ -82,8 +79,6 @@ namespace mikroservisnaApp.Controllers
         }
 
         // POST: TipDogadjaja/Edit/5
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(int id, [Bind("Id,Naziv")] TipDogadjaja tipDogadjaja)

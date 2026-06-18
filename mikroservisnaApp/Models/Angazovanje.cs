@@ -11,5 +11,7 @@
 
         public int DogadjajId { get; set; }
         public Dogadjaj? Dogadjaj { get; set; }
+
+        public Guid? SagaCorrelationId { get; set; }
     }
 }

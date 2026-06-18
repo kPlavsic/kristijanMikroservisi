@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using mikroservisnaApp.Entities;
 using mikroservisnaApp.Models;
 
 namespace mikroservisnaApp.Data
@@ -15,5 +16,6 @@ namespace mikroservisnaApp.Data
         public DbSet<Lokacija> Lokacije { get; set; }
         public DbSet<TipDogadjaja> TipoviDogadjaja { get; set; }
         public DbSet<Angazovanje> Angazovanja { get; set; }
+        public DbSet<OutboxMessage> OutboxMessages { get; set; }
     }
 }

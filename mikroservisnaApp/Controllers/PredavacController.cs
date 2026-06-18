@@ -1,10 +1,15 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using mikroservisnaApp.Data;
+using mikroservisnaApp.Entities;
 using mikroservisnaApp.Models;
 using mikroservisnaApp.Patterns;
 using mikroservisnaApp.PredavacAPI.DTO;
+using mikroservisnaApp.Shared.Events;
 using Polly;
+using Polly.Timeout;
+using System.Text.Json;
+using System.Threading;
 
 namespace mikroservisnaApp.Controllers
 {
@@ -30,15 +35,20 @@ namespace mikroservisnaApp.Controllers
             {
                 HttpResponseMessage? httpResponseMessage = null;
 
-                var retryPolicy = Policy.Handle<HttpRequestException>()
+                var retryPolicy = Policy<HttpResponseMessage>
+                    .Handle<HttpRequestException>() //iskljucivo na HttpRequestException
                     .WaitAndRetryAsync(2, attempt => TimeSpan.FromMilliseconds(250));
 
-                httpResponseMessage = await retryPolicy.ExecuteAsync(async () =>
+                var timeoutPolicy = Policy.TimeoutAsync<HttpResponseMessage>(TimeSpan.FromSeconds(10), TimeoutStrategy.Optimistic);
+
+                var policyWrap = Policy.WrapAsync(retryPolicy, timeoutPolicy);
+
+                httpResponseMessage = await policyWrap.ExecuteAsync(async (ct) =>
                 {
-                    var response = await httpClient.GetAsync("/Predavac");
-                    response.EnsureSuccessStatusCode();
+                    var response = await httpClient.GetAsync("/Predavac", ct);
+                    response.EnsureSuccessStatusCode(); //HttpRequestException ako API vrati 4xx ili 5xx — Polly to hvata.
                     return response;
-                });
+                }, CancellationToken.None);
 
                 var predavaci = await httpResponseMessage.Content.ReadFromJsonAsync<List<PredavacDTO>>();
 
@@ -53,9 +63,14 @@ namespace mikroservisnaApp.Controllers
 
                 return View(viewModels);
             }
-            catch (TaskCanceledException)
+            catch (TimeoutRejectedException)
             {
                 ViewBag.ExceptionMessage = "Nije moguće učitati predavače. Timeout istekao.";
+                return View(new List<Predavac>());
+            }
+            catch (TaskCanceledException)
+            {
+                ViewBag.ExceptionMessage = "Nije moguće učitati predavače.";
                 return View(new List<Predavac>());
             }
             catch (HttpRequestException)
@@ -133,13 +148,36 @@ namespace mikroservisnaApp.Controllers
                     OblastStrucnosti = predavac.OblastStrucnosti
                 };
 
-                await httpClient.PostAsJsonAsync("/Predavac", predavacDTO);
+                
+                var response = await httpClient.PostAsJsonAsync("/Predavac", predavacDTO);
+                response.EnsureSuccessStatusCode();
+
+                var newId = await response.Content.ReadFromJsonAsync<int>();
+
+               
+                var messageId = Guid.NewGuid().ToString();
+
+                var outboxMessage = new OutboxMessage
+                {
+                    MessageId = messageId,
+                    EventType = "PredavacCreated",
+                    Payload = JsonSerializer.Serialize(new PredavacCreatedEvent
+                    {
+                        MessageId = messageId,
+                        PredavacId = newId,
+                        Ime = predavacDTO.Ime,
+                        Prezime = predavacDTO.Prezime
+                    }),
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                _context.OutboxMessages.Add(outboxMessage);
+                await _context.SaveChangesAsync();
 
                 return RedirectToAction(nameof(Index));
             }
             return View(predavac);
         }
-
         // GET: Predavac/Edit/5
         public async Task<IActionResult> Edit(int? id)
         {

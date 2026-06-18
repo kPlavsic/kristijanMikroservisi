@@ -9,12 +9,12 @@
 
     public class CircuitBreaker
     {
-        private object _lock = new object(); //thread safety, jedan po jedan rade
-        private readonly int _failureThreshold;  // koliko grešaka pre otvaranja
-        private readonly TimeSpan _openDuration; // koliko dugo ostaje Open
-        private DateTime _lastFailureTime;       // kada je bila poslednja greška
-        private int _failureCount;               // trenutni broj grešaka
-        private CircuitBreakerState _state;      // trenutno stanje
+        private object _lock = new object(); 
+        private readonly int _failureThreshold;  
+        private readonly TimeSpan _openDuration; 
+        private DateTime _lastFailureTime;       
+        private int _failureCount;               
+        private CircuitBreakerState _state;      
 
         public CircuitBreaker(int failureThreshold, TimeSpan openDuration)
         {
@@ -22,8 +22,7 @@
             _openDuration = openDuration;
         }
 
-        //Svaki put kada neko čita State, proverava se — "da li je Open i da li je prošlo dovoljno vremena?"
-        //Ako jeste, automatski prelazi u HalfOpen. Nema posebnog timera, jednostavno proverava svaki put kada se pita za stanje.
+        
         public CircuitBreakerState State
         {
             get

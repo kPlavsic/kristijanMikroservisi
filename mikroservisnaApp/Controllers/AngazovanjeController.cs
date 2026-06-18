@@ -1,12 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using mikroservisnaApp.Data;
+using mikroservisnaApp.Messaging;
 using mikroservisnaApp.Models;
+using RabbitMQ.Client;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace mikroservisnaApp.Controllers
 {
@@ -55,20 +57,54 @@ namespace mikroservisnaApp.Controllers
         }
 
         // POST: Angazovanje/Create
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create([Bind("Id,NazivPredavanja,Vreme,PredavacId,DogadjajId")] Angazovanje angazovanje)
         {
             if (ModelState.IsValid)
             {
-                _context.Add(angazovanje);
-                await _context.SaveChangesAsync();
+                var correlationId = Guid.NewGuid().ToString();
+
+                var sagaEvent = new mikroservisnaApp.Shared.Events.AngazovanjeRequestedEvent
+                {
+                    CorrelationId = correlationId,
+                    PredavacId = angazovanje.PredavacId,
+                    DogadjajId = angazovanje.DogadjajId,
+                    NazivPredavanja = angazovanje.NazivPredavanja!,
+                    Vreme = angazovanje.Vreme
+                };
+
+                var factory = new RabbitMQ.Client.ConnectionFactory()
+                {
+                    HostName = "localhost",
+                    UserName = "guest",
+                    Password = "guest"
+                };
+
+                await using var connection = await factory.CreateConnectionAsync();
+                await using var channel = await connection.CreateChannelAsync();
+
+                await channel.QueueDeclareAsync(
+                    queue: "saga.angazovanje.requested",
+                    durable: true,
+                    exclusive: false,
+                    autoDelete: false);
+
+                var body = System.Text.Encoding.UTF8.GetBytes(
+                    System.Text.Json.JsonSerializer.Serialize(sagaEvent));
+
+                await channel.BasicPublishAsync(
+                    exchange: string.Empty,
+                    routingKey: "saga.angazovanje.requested",
+                    body: body);
+
+                TempData["SagaInfo"] = $"Zahtev za angazovanje je primljen i obradjuje se. ID: {correlationId}";
+
                 return RedirectToAction(nameof(Index));
             }
-            ViewData["DogadjajId"] = new SelectList(_context.Dogadjaji, "Id", "Naziv", angazovanje.DogadjajId);
-            ViewData["PredavacId"] = new SelectList(_context.Predavaci, "Id", "Ime", angazovanje.PredavacId);
+
+            ViewData["DogadjajId"] = new Microsoft.AspNetCore.Mvc.Rendering.SelectList(_context.Dogadjaji, "Id", "Naziv", angazovanje.DogadjajId);
+            ViewData["PredavacId"] = new Microsoft.AspNetCore.Mvc.Rendering.SelectList(_context.Predavaci, "Id", "Ime", angazovanje.PredavacId);
             return View(angazovanje);
         }
 
