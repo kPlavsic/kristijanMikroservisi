@@ -15,7 +15,6 @@ namespace mikroservisnaApp.LokacijaAPI.EventSourcing.Store
             _context = context;
         }
 
-        // Cuva nove dogadjaje u bazu
         public async Task SaveEventsAsync(int aggregateId, IReadOnlyList<Event> events)
         {
             foreach (var @event in events)
@@ -35,7 +34,6 @@ namespace mikroservisnaApp.LokacijaAPI.EventSourcing.Store
             await _context.SaveChangesAsync();
         }
 
-        // Ucitava sve dogadjaje za jednu lokaciju
         public async Task<List<Event>> LoadEventsAsync(int aggregateId)
         {
             var storedEvents = await _context.Events
@@ -46,7 +44,6 @@ namespace mikroservisnaApp.LokacijaAPI.EventSourcing.Store
             return storedEvents.Select(Deserialize).ToList();
         }
 
-        // Ucitava dogadjaje nastale NAKON odredjene verzije (za snapshot)
         public async Task<List<Event>> LoadEventsAfterVersionAsync(int aggregateId, int version)
         {
             var storedEvents = await _context.Events
@@ -58,7 +55,6 @@ namespace mikroservisnaApp.LokacijaAPI.EventSourcing.Store
             return storedEvents.Select(Deserialize).ToList();
         }
 
-        // Cuva snapshot u bazu
         public async Task SaveSnapshotAsync(int aggregateId, LokacijaSnapshot snapshot)
         {
             var existing = await _context.Snapshots
@@ -84,7 +80,6 @@ namespace mikroservisnaApp.LokacijaAPI.EventSourcing.Store
             await _context.SaveChangesAsync();
         }
 
-        // Ucitava snapshot ako postoji
         public async Task<LokacijaSnapshot?> LoadSnapshotAsync(int aggregateId)
         {
             var stored = await _context.Snapshots
@@ -96,7 +91,6 @@ namespace mikroservisnaApp.LokacijaAPI.EventSourcing.Store
             return JsonSerializer.Deserialize<LokacijaSnapshot>(stored.SnapshotData);
         }
 
-        // Rekonstruise trenutno stanje lokacije
         public async Task<LokacijaAggregate?> LoadAggregateAsync(int aggregateId)
         {
             var snapshot = await LoadSnapshotAsync(aggregateId);
@@ -119,7 +113,6 @@ namespace mikroservisnaApp.LokacijaAPI.EventSourcing.Store
             return aggregate;
         }
 
-        // Ucitava SVE dogadjaje za prikaz istorije
         public async Task<List<StoredEvent>> LoadHistoryAsync(int aggregateId)
         {
             return await _context.Events
@@ -128,7 +121,6 @@ namespace mikroservisnaApp.LokacijaAPI.EventSourcing.Store
                 .ToListAsync();
         }
 
-        // Deserijalizuje dogadjaj iz JSON-a nazad u objekat
         private Event Deserialize(StoredEvent stored)
         {
             var eventType = stored.EventType switch

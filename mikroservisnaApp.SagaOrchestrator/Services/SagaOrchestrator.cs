@@ -19,9 +19,6 @@ namespace mikroservisnaApp.SagaOrchestrator.Services
             _logger = logger;
         }
 
-        // =============================================
-        // KORAK 1: Stigao zahtev za kreiranje angazovanja
-        // =============================================
         public async Task HandleAngazovanjeRequestedAsync(AngazovanjeRequestedEvent evt)
         {
             _logger.LogInformation("[SAGA] Primljen zahtev za angazovanje. CorrelationId: {Id}", evt.CorrelationId);
@@ -68,9 +65,7 @@ namespace mikroservisnaApp.SagaOrchestrator.Services
             _logger.LogInformation("[SAGA] Stanje kreirano, ceka se rezervacija predavaca.");
         }
 
-        // =============================================
-        // KORAK 2: Predavac je rezervisan, idi na dogadjaj
-        // =============================================
+
         public async Task HandlePredavacRezervisanAsync(PredavacReservationResponseEvent evt)
         {
             var sagaState = await _db.SagaStates
@@ -117,9 +112,6 @@ namespace mikroservisnaApp.SagaOrchestrator.Services
             _logger.LogInformation("[SAGA] Predavac rezervisan, saljem zahtev za dogadjaj.");
         }
 
-        // =============================================
-        // KORAK 3: Dogadjaj potvrđen, kreiraj angazovanje
-        // =============================================
         public async Task HandleDogadjajPotvrdenAsync(DogadjajReservationResponseEvent evt)
         {
             var sagaState = await _db.SagaStates
@@ -183,9 +175,6 @@ namespace mikroservisnaApp.SagaOrchestrator.Services
             _logger.LogInformation("[SAGA] Dogadjaj potvrđen, saljem zahtev za kreiranje angazovanja.");
         }
 
-        // =============================================
-        // KORAK 4: Angazovanje kreirano — Saga završena
-        // =============================================
         public async Task HandleAngazovanjeKreiranoAsync(AngazovanjeKreiranoEvent evt)
         {
             var sagaState = await _db.SagaStates

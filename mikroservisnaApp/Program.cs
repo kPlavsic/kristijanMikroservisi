@@ -29,6 +29,7 @@ builder.Services.AddHostedService<OutboxMessagePublisher>();
 builder.Services.AddHostedService<EmailWorker>();
 builder.Services.AddHostedService<PredavacEventConsumer>();
 builder.Services.AddHostedService<SagaAngazovanjeConsumer>();
+builder.Services.AddHostedService<SagaDogadjajKoreografijaConsumer>();
 
 var app = builder.Build();
 

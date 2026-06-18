@@ -40,13 +40,11 @@ namespace mikroservisnaApp.SagaOrchestrator.Services
             _connection = await factory.CreateConnectionAsync();
             _channel = await _connection.CreateChannelAsync();
 
-            // Deklarisemo sve queue-ove koje slušamo
             await DeclareQueueAsync(QueueAngazovanjeRequested);
             await DeclareQueueAsync(QueuePredavacResponse);
             await DeclareQueueAsync(QueueDogadjajResponse);
             await DeclareQueueAsync(QueueAngazovanjeKreirano);
 
-            // Postavljamo consumer za svaki queue
             await ConsumeQueueAsync(QueueAngazovanjeRequested, HandleAngazovanjeRequestedAsync);
             await ConsumeQueueAsync(QueuePredavacResponse, HandlePredavacResponseAsync);
             await ConsumeQueueAsync(QueueDogadjajResponse, HandleDogadjajResponseAsync);

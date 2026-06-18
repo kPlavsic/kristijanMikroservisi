@@ -18,12 +18,10 @@ namespace mikroservisnaApp.LokacijaAPI.CQRS.Commands
 
         public async Task<int> Handle(KreirajLokacijuCommand command)
         {
-            // Proveri da li vec postoji lokacija sa tim ID-em
             var existing = await _eventStore.LoadAggregateAsync(command.Id);
             if (existing != null)
                 throw new InvalidOperationException($"Lokacija sa ID {command.Id} vec postoji.");
 
-            // Kreiraj agregat — validacija je unutar Kreiraj metode
             var lokacija = LokacijaAggregate.Kreiraj(
                 command.Id,
                 command.Naziv,
@@ -31,10 +29,8 @@ namespace mikroservisnaApp.LokacijaAPI.CQRS.Commands
                 command.Kapacitet
             );
 
-            // Sacuvaj dogadjaje u Event Store
             await _eventStore.SaveEventsAsync(lokacija.ID, lokacija.DequeueUnsavedEvents());
 
-            // Azuriraj Read Model (CQRS write strana azurira read stranu)
             _context.LokacijeReadModel.Add(new LokacijaReadModel
             {
                 Id = lokacija.ID,

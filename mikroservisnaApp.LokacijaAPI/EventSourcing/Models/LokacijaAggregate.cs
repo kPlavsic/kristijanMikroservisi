@@ -9,9 +9,6 @@ namespace mikroservisnaApp.LokacijaAPI.EventSourcing.Models
         public int Kapacitet { get; private set; }
         public bool Obrisana { get; private set; } = false;
 
-        // -------------------------------------------------------
-        // KOMANDE — jedini nacin da se promeni stanje
-        // -------------------------------------------------------
 
         public static LokacijaAggregate Kreiraj(int id, string naziv, string adresa, int kapacitet)
         {
@@ -97,10 +94,6 @@ namespace mikroservisnaApp.LokacijaAPI.EventSourcing.Models
             });
         }
 
-        // -------------------------------------------------------
-        // APPLY — kako svaki dogadjaj menja stanje objekta
-        // -------------------------------------------------------
-
         protected override void Apply(Event @event)
         {
             switch (@event)
@@ -128,10 +121,6 @@ namespace mikroservisnaApp.LokacijaAPI.EventSourcing.Models
                     throw new InvalidOperationException($"Nepoznat tip dogadjaja: {@event.GetType().Name}");
             }
         }
-
-        // -------------------------------------------------------
-        // SNAPSHOT
-        // -------------------------------------------------------
 
         public override AggregateSnapshot CreateSnapshot()
         {

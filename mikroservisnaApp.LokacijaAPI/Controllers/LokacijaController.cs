@@ -37,9 +37,7 @@ namespace mikroservisnaApp.LokacijaAPI.Controllers
             _eventStore = eventStore;
         }
 
-        // -------------------------------------------------------
-        // KOMANDE — menjaju stanje
-        // -------------------------------------------------------
+
 
         [HttpPost]
         public async Task<IActionResult> Kreiraj([FromBody] KreirajLokacijuCommand command)
@@ -112,9 +110,7 @@ namespace mikroservisnaApp.LokacijaAPI.Controllers
             }
         }
 
-        // -------------------------------------------------------
-        // UPITI — samo citaju, nista ne menjaju
-        // -------------------------------------------------------
+        
 
         [HttpGet]
         public async Task<IActionResult> GetSve()

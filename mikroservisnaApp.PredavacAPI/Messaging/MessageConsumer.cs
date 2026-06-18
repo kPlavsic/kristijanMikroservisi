@@ -15,7 +15,6 @@ namespace mikroservisnaApp.PredavacAPI.Messaging
         private const string RoutingKey = "predavac.events";
         private const string ValidationRequestQueue = "predavac.validation.request";
 
-        // Saga queue-ovi
         private const string SagaRezervisіQueue = "saga.predavac.rezervisi";
         private const string SagaOtkaziQueue = "saga.predavac.otkazi";
         private const string SagaResponseQueue = "saga.predavac.response";
@@ -44,20 +43,17 @@ namespace mikroservisnaApp.PredavacAPI.Messaging
             _connection = await factory.CreateConnectionAsync();
             _channel = await _connection.CreateChannelAsync();
 
-            // Postojeci redovi
             await _channel.ExchangeDeclareAsync(ExchangeName, ExchangeType.Direct, durable: true, autoDelete: false);
             await _channel.QueueDeclareAsync(QueueName, durable: true, exclusive: false, autoDelete: false);
             await _channel.QueueBindAsync(QueueName, ExchangeName, RoutingKey);
             await _channel.QueueDeclareAsync(ValidationRequestQueue, durable: false, exclusive: false, autoDelete: false);
 
-            // Saga redovi
             await _channel.QueueDeclareAsync(SagaRezervisіQueue, durable: true, exclusive: false, autoDelete: false);
             await _channel.QueueDeclareAsync(SagaOtkaziQueue, durable: true, exclusive: false, autoDelete: false);
             await _channel.QueueDeclareAsync(SagaResponseQueue, durable: true, exclusive: false, autoDelete: false);
 
             await _channel.BasicQosAsync(prefetchSize: 0, prefetchCount: 1, global: false);
 
-            // Postojeci consumeri
             var eventConsumer = new AsyncEventingBasicConsumer(_channel);
             eventConsumer.ReceivedAsync += async (_, ea) => await HandlePredavacEventAsync(ea, stoppingToken);
             await _channel.BasicConsumeAsync(queue: QueueName, autoAck: false, consumer: eventConsumer);
@@ -66,7 +62,6 @@ namespace mikroservisnaApp.PredavacAPI.Messaging
             validationConsumer.ReceivedAsync += async (_, ea) => await HandleValidationRequestAsync(ea, stoppingToken);
             await _channel.BasicConsumeAsync(queue: ValidationRequestQueue, autoAck: false, consumer: validationConsumer);
 
-            // Saga consumeri
             var sagaRezervisіConsumer = new AsyncEventingBasicConsumer(_channel);
             sagaRezervisіConsumer.ReceivedAsync += async (_, ea) => await HandleSagaRezervisiAsync(ea, stoppingToken);
             await _channel.BasicConsumeAsync(queue: SagaRezervisіQueue, autoAck: false, consumer: sagaRezervisіConsumer);
@@ -81,9 +76,7 @@ namespace mikroservisnaApp.PredavacAPI.Messaging
             catch (OperationCanceledException) { }
         }
 
-        // =============================================
-        // SAGA: Rezervisi predavaca
-        // =============================================
+        
         private async Task HandleSagaRezervisiAsync(BasicDeliverEventArgs ea, CancellationToken cancellationToken)
         {
             if (_channel is null) return;
@@ -130,9 +123,7 @@ namespace mikroservisnaApp.PredavacAPI.Messaging
             }
         }
 
-        // =============================================
-        // SAGA: Kompenzacija — otkazi rezervaciju
-        // =============================================
+
         private async Task HandleSagaOtkaziAsync(BasicDeliverEventArgs ea, CancellationToken cancellationToken)
         {
             if (_channel is null) return;

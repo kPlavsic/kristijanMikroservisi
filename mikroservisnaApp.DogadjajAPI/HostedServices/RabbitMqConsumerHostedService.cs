@@ -19,7 +19,6 @@ namespace mikroservisnaApp.DogadjajAPI.HostedServices
         private const string DeadLetterQueueName = "predavac.deadletter.queue";
         private const int MaxRetryCount = 10;
 
-        // Saga queue-ovi
         private const string SagaPotvrdiQueue = "saga.dogadjaj.potvrdi";
         private const string SagaOtkaziQueue = "saga.dogadjaj.otkazi";
         private const string SagaResponseQueue = "saga.dogadjaj.response";
@@ -51,7 +50,6 @@ namespace mikroservisnaApp.DogadjajAPI.HostedServices
             _connection = await factory.CreateConnectionAsync();
             _channel = await _connection.CreateChannelAsync();
 
-            // Dead Letter Exchange
             await _channel.ExchangeDeclareAsync(
                 exchange: DeadLetterExchangeName,
                 type: ExchangeType.Fanout,
@@ -74,7 +72,6 @@ namespace mikroservisnaApp.DogadjajAPI.HostedServices
                 { "x-dead-letter-exchange", DeadLetterExchangeName }
             };
 
-            // Postojeci redovi
             await _channel.ExchangeDeclareAsync(ExchangeName, ExchangeType.Direct, durable: true, autoDelete: false);
             await _channel.QueueDeclareAsync(
                 queue: QueueName,
@@ -84,19 +81,16 @@ namespace mikroservisnaApp.DogadjajAPI.HostedServices
                 arguments: queueArguments);
             await _channel.QueueBindAsync(QueueName, ExchangeName, RoutingKey);
 
-            // Saga redovi
             await _channel.QueueDeclareAsync(SagaPotvrdiQueue, durable: true, exclusive: false, autoDelete: false);
             await _channel.QueueDeclareAsync(SagaOtkaziQueue, durable: true, exclusive: false, autoDelete: false);
             await _channel.QueueDeclareAsync(SagaResponseQueue, durable: true, exclusive: false, autoDelete: false);
 
             await _channel.BasicQosAsync(prefetchSize: 0, prefetchCount: 1, global: false);
 
-            // Postojeci consumer
             var consumer = new AsyncEventingBasicConsumer(_channel);
             consumer.ReceivedAsync += async (_, ea) => await HandleMessageAsync(ea, stoppingToken);
             await _channel.BasicConsumeAsync(queue: QueueName, autoAck: false, consumer: consumer);
 
-            // Saga consumeri
             var sagaPotvrdiConsumer = new AsyncEventingBasicConsumer(_channel);
             sagaPotvrdiConsumer.ReceivedAsync += async (_, ea) => await HandleSagaPotvrdiAsync(ea, stoppingToken);
             await _channel.BasicConsumeAsync(queue: SagaPotvrdiQueue, autoAck: false, consumer: sagaPotvrdiConsumer);
@@ -111,9 +105,6 @@ namespace mikroservisnaApp.DogadjajAPI.HostedServices
             catch (OperationCanceledException) { }
         }
 
-        // =============================================
-        // SAGA: Potvrdi dogadjaj
-        // =============================================
         private async Task HandleSagaPotvrdiAsync(BasicDeliverEventArgs ea, CancellationToken cancellationToken)
         {
             if (_channel is null) return;
@@ -133,16 +124,14 @@ namespace mikroservisnaApp.DogadjajAPI.HostedServices
 
                 using var scope = _scopeFactory.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<DogadjajDbContext>();
-                var exists = await db.PredavacReference
-                    .AnyAsync(p => p.Id == request.DogadjajId, cancellationToken);
 
                 // Proveravamo da li dogadjaj postoji u nasoj lokalnoj tabeli
-                // (DogadjajAPI cuva reference na predavace, koristimo to kao proxy za dogadjaje)
+               
                 var response = new DogadjajReservationResponseEvent
                 {
                     CorrelationId = request.CorrelationId,
                     DogadjajId = request.DogadjajId,
-                    Success = true, // DogadjajAPI uvek potvrdjuje - dogadjaj postoji u glavnoj app
+                    Success = true, 
                     FailedReason = null
                 };
 
@@ -163,9 +152,7 @@ namespace mikroservisnaApp.DogadjajAPI.HostedServices
             }
         }
 
-        // =============================================
-        // SAGA: Kompenzacija — otkazi rezervaciju dogadjaja
-        // =============================================
+
         private async Task HandleSagaOtkaziAsync(BasicDeliverEventArgs ea, CancellationToken cancellationToken)
         {
             if (_channel is null) return;
@@ -195,7 +182,6 @@ namespace mikroservisnaApp.DogadjajAPI.HostedServices
             }
         }
 
-        // Postojeci handler - nepromenjen
         private async Task HandleMessageAsync(BasicDeliverEventArgs ea, CancellationToken cancellationToken)
         {
             if (_channel is null) return;

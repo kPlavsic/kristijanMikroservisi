@@ -27,6 +27,8 @@ builder.Services.AddScoped<IQueryHandler<GetSveLokacijeQuery, List<LokacijaListI
 builder.Services.AddScoped<IQueryHandler<GetLokacijaDetaljiQuery, LokacijaDetalji?>, GetLokacijaDetaljiQueryHandler>();
 builder.Services.AddScoped<IQueryHandler<GetLokacijePoKapacitetuQuery, List<LokacijaListItem>>, GetLokacijePoKapacitetuQueryHandler>();
 
+builder.Services.AddHostedService<mikroservisnaApp.LokacijaAPI.Messaging.SagaKoreografijaConsumer>();
+
 var app = builder.Build();
 
 app.UseHttpsRedirection();

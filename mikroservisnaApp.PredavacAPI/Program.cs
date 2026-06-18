@@ -12,6 +12,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddHostedService<MessageConsumer>();
+builder.Services.AddHostedService<SagaKoreografijaConsumer>();
 
 var app = builder.Build();
 

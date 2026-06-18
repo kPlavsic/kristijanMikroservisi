@@ -1,0 +1,77 @@
+﻿{
+  "Routes": [
+    {
+      "UpstreamPathTemplate": "/predavaci",
+      "UpstreamHttpMethod": [ "GET", "POST" ],
+
+      "DownstreamPathTemplate": "/Predavac",
+      "DownstreamScheme": "http",
+
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "localhost",
+          "Port": 5286
+        }
+      ],
+      //"RateLimitOptions": {
+      //  "EnableRateLimiting": true,
+      //  "Period": "1m",
+      //  "Limit": 3
+      //}
+    },
+    {
+      "UpstreamPathTemplate": "/predavaci/{everything}",
+      "UpstreamHttpMethod": [ "GET", "POST", "PUT", "DELETE" ],
+
+      "DownstreamPathTemplate": "/Predavac/{everything}",
+      "DownstreamScheme": "http",
+
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "localhost",
+          "Port": 5286
+        }
+      ],
+      "RateLimitOptions": {
+        "EnableRateLimiting": true,
+        "Period": "1m",
+        "Limit": 3
+      }
+    },
+    {
+      "UpstreamPathTemplate": "/lokacije",
+      "UpstreamHttpMethod": [ "GET", "POST" ],
+
+      "DownstreamPathTemplate": "/api/Lokacija",
+      "DownstreamScheme": "http",
+
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "localhost",
+          "Port": 5173
+        }
+      ]
+    },
+    {
+      "UpstreamPathTemplate": "/lokacije/{everything}",
+      "UpstreamHttpMethod": [ "GET", "POST", "PUT", "DELETE" ],
+
+      "DownstreamPathTemplate": "/api/Lokacija/{everything}",
+      "DownstreamScheme": "http",
+
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "localhost",
+          "Port": 5173
+        }
+      ]
+    }
+  ],
+
+  "GlobalConfiguration": {
+    "BaseUrl": "http://localhost:7000"//,
+    //"RateLimitOptions": {
+    //  "ClientIdHeader": "X-Client-Id"
+    //}
+  }
+}
